@@ -48,7 +48,7 @@ fn main() {
         ("init",   Some(matches)) => handle_init   (matches, &mut hermit, &mut file_operations),
         ("nuke",   Some(matches)) => handle_nuke   (matches, &mut hermit, &mut file_operations),
         ("status", Some(matches)) => handle_status (matches, &mut hermit, &mut file_operations),
-        ("use",    Some(matches)) => handle_use    (matches, &mut hermit, &mut file_operations),
+        ("inhabit",    Some(matches)) => handle_inhabit    (matches, &mut hermit, &mut file_operations),
         _ => unreachable!(message::error("unknown subcommand passed"))
     };
 
@@ -79,7 +79,7 @@ fn make_app_config<'a, 'b>() -> App<'a, 'b> {
     let app = add_init_subcommand(app);
     let app = add_nuke_subcommand(app);
     let app = add_status_subcommand(app);
-    let app = add_use_subcommand(app);
+    let app = add_inhabit_subcommand(app);
 
     app
 }
@@ -185,13 +185,13 @@ fn handle_status<C: Config>(_matches: &ArgMatches,
 
 
 subcommand!{
-  add_use_subcommand("use") {
+  add_inhabit_subcommand("inhabit") {
     about("Switch to using a different hermit shell")
   }
 }
 
-fn handle_use<C: Config>(_matches: &ArgMatches,
+fn handle_inhabit<C: Config>(_matches: &ArgMatches,
                          _hermit: &mut Hermit<C>,
                          _file_operations: &mut FileOperations) {
-    println!("hermit use is not implemented yet.")
+    println!("hermit inhabit is not implemented yet.")
 }
