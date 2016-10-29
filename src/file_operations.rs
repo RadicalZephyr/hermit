@@ -65,6 +65,32 @@ pub struct FileOperations {
     git_init_opts: git2::RepositoryInitOptions,
 }
 
+macro_rules! file_operations {
+    { ( $_self:ident )
+        $(
+            $fn_name:ident($call_arg:ident ) => $op_constructor:expr; {
+                $run_expr:expr
+            }
+        )+
+    } => {
+        $(
+            pub fn $fn_name<P: AsRef<Path>>(&mut self, $call_arg: P) {
+                self.operations.push($op_constructor);
+            }
+        )+
+
+        fn do_op(&mut $_self, op: Op) -> Result {
+            match op {
+                $(
+                    $op_type($call_arg) => try!($run_expr),
+                )+
+            };
+            Ok(())
+        }
+    }
+}
+
+
 impl FileOperations {
     pub fn rooted_at<P: AsRef<Path>>(path: P) -> FileOperations {
         FileOperations {
@@ -74,58 +100,51 @@ impl FileOperations {
         }
     }
 
-    fn default_git_opts() -> git2::RepositoryInitOptions {
-        let mut opts = git2::RepositoryInitOptions::new();
-        opts.no_reinit(true);
-
-        opts
-    }
-
-    pub fn create_dir<P: AsRef<Path>>(&mut self, name: P) {
-        self.operations.push(Op::MkDir(self.root.join(name)))
-    }
-
-    pub fn create_dir_all<P: AsRef<Path>>(&mut self, name: P) {
-        self.operations.push(Op::MkDirAll(self.root.join(name)))
-    }
-
-    pub fn link<P: AsRef<Path>, Q: AsRef<Path>>(&mut self, source: P, dest: Q) {
-        self.operations.push(Op::Link(source.as_ref().to_path_buf(), self.root.join(dest)));
-    }
-
-    pub fn remove<P: AsRef<Path>>(&mut self, file: P) {
-        self.operations.push(Op::Remove(self.root.join(file)));
-    }
-
-    pub fn create_git_repo<P: AsRef<Path>>(&mut self, name: P) {
-        self.operations.push(Op::GitInit(self.root.join(name)))
-    }
-
     pub fn commit(mut self) -> Vec<Result> {
         let ops = self.operations;
         self.operations = vec![];
         self.operations.push(Op::MkDir(PathBuf::new()));
 
         ops.into_iter()
-           .map(|op| self.do_op(op))
-           .collect::<Vec<_>>()
+            .map(|op| self.do_op(op))
+            .collect::<Vec<_>>()
     }
 
-    /// Private Methods
+    file_operations!{
+        // This is a concession to Rust's macro hygiene rules
+        // https://github.com/rust-lang/rust/issues/15682#issuecomment-49004939
+        (self)
 
-    fn do_op(&mut self, op: Op) -> Result {
-        match op {
-            Op::MkDir(dir) => fs::create_dir(dir)?,
-            Op::MkDirAll(dir) => fs::create_dir_all(dir)?,
-            Op::GitInit(dir) => self.git_init(dir)?,
-            Op::Link(src, dest) => unix::fs::symlink(src, dest)?,
-            Op::Remove(file) => fs::remove_file(file)?,
-        };
-        Ok(())
+        create_dir(dir) => Op::MkDir(self.root.join(dir)); {
+            fs::create_dir(dir)
+        }
+
+        create_dir_all(dir) => Op::MkDirAll(self.root.join(dir)); {
+            fs::create_dir_all(dir)
+        }
+
+        // pub fn link<P: AsRef<Path>, Q: AsRef<Path>>(&mut self, source: P, dest: Q) {
+        //     self.operations.push(Op::Link(source.as_ref().to_path_buf(), self.root.join(dest)));
+        // }
+
+        remove(file) => Op::Remove(self.root.join(file)); {
+            fs::remove_file(file)
+        }
+
+        create_git_repo(dir) => Op::GitInit(self.root.join(dir)); {
+            self.git_init(dir)
+        }
     }
 
     fn git_init(&self, dir: PathBuf) -> result::Result<(), git2::Error> {
         git2::Repository::init_opts(dir, &self.git_init_opts).map(|_| ())
+    }
+
+    fn default_git_opts() -> git2::RepositoryInitOptions {
+        let mut opts = git2::RepositoryInitOptions::new();
+        opts.no_reinit(true);
+
+        opts
     }
 }
 
