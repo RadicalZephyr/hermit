@@ -193,9 +193,9 @@ subcommand!{
 
 fn handle_inhabit<C: Config>(matches: &ArgMatches,
                              hermit: &mut Hermit<C>,
-                             _file_operations: &mut FileOperations) {
+                             file_operations: &mut FileOperations) {
     let shell_name = matches.value_of("SHELL_NAME").unwrap_or("");
-    let res = hermit.inhabit_shell(_file_operations, shell_name);
+    let res = hermit.inhabit_shell(file_operations, shell_name);
     match res {
         Ok(v) => v,
         Err(err) => {
