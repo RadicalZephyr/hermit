@@ -1,4 +1,4 @@
-use std::{io, iter};
+use std::{io};
 use std::io::prelude::*;
 use std::borrow::Borrow;
 use std::fs::File;

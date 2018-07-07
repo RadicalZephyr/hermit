@@ -21,7 +21,6 @@ mod file_operations;
 mod macros;
 
 use std::process;
-use std::result;
 
 use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
 
