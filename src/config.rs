@@ -116,7 +116,17 @@ where T: Iterator<Item = Result<walkdir::DirEntry, walkdir::Error>>,
     type Item = PathBuf;
 
     fn next(&mut self) -> Option<Self::Item> {
-        None
+        if let Some(ref mut iter) = self.0 {
+            loop {
+                match iter.next() {
+                    Some(Ok(entry)) => return Some(entry.path().to_path_buf()),
+                    Some(Err(_)) => continue,
+                    None => return None,
+                };
+            }
+        } else {
+            None
+        }
     }
 }
 
