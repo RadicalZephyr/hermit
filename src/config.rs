@@ -97,10 +97,10 @@ impl Config for FsConfig {
 }
 
 
-pub struct FilesIter<T>(Option<T>);
+pub struct FilesIter<T>(Option<(T, PathBuf)>);
 
 impl<T> FilesIter<T> {
-    pub fn new(iter: Option<T>) -> FilesIter<T> {
+    pub fn new(iter: Option<(T, PathBuf)>) -> FilesIter<T> {
         FilesIter(iter)
     }
 }
@@ -111,10 +111,17 @@ where T: Iterator<Item = Result<walkdir::DirEntry, walkdir::Error>>,
     type Item = PathBuf;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some(ref mut iter) = self.0 {
+        if let Some((ref mut iter, ref prefix_path)) = self.0 {
             loop {
                 match iter.next() {
-                    Some(Ok(entry)) => return Some(entry.path().to_path_buf()),
+                    Some(Ok(entry)) => {
+                        let file_path = entry.path().to_path_buf();
+                        let shell_relative_path = file_path
+                            .strip_prefix(prefix_path)
+                            .unwrap()
+                            .to_path_buf();
+                        return Some(shell_relative_path);
+                    },
                     Some(Err(_)) => continue,
                     None => return None,
                 };
@@ -125,15 +132,16 @@ where T: Iterator<Item = Result<walkdir::DirEntry, walkdir::Error>>,
     }
 }
 
-pub struct Files(Option<WalkDir>);
+pub struct Files(Option<(WalkDir, PathBuf)>);
 
 impl Files {
     pub fn new(shell_path: Option<impl AsRef<Path>>) -> Files {
         let walker =
             shell_path.map(|path| {
-                WalkDir::new(path)
-                    .min_depth(1)
-                    .follow_links(false)
+                (WalkDir::new(&path)
+                 .min_depth(1)
+                 .follow_links(false),
+                 PathBuf::from(path.as_ref()))
             });
         Files(walker)
     }
@@ -144,9 +152,9 @@ impl IntoIterator for Files {
     type IntoIter = FilesIter<walkdir::IntoIter>;
 
     fn into_iter(self) -> Self::IntoIter {
-        let Files(iter) = self;
-        let iter = iter.map(|walker| walker.into_iter());
-        FilesIter::new(iter)
+        let Files(opt) = self;
+        let iter_opt = opt.map(|(walker, path)| (walker.into_iter(), path));
+        FilesIter::new(iter_opt)
     }
 }
 
