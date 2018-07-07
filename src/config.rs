@@ -1,10 +1,14 @@
-use std::io;
+use std::{io, iter};
 use std::io::prelude::*;
 use std::borrow::Borrow;
 use std::fs::File;
 use std::path::{Path, PathBuf};
 
+use walkdir::{self, WalkDir};
+
 pub trait Config {
+    type IntoIterator: IntoIterator<Item = PathBuf>;
+
     fn root_path(&self) -> &PathBuf;
 
     fn shell_root_path(&self) -> PathBuf {
@@ -21,12 +25,17 @@ pub trait Config {
     fn set_current_shell_name(&mut self, name: &str) -> io::Result<()>;
 
     fn shell_exists(&self, name: &str) -> bool;
+
+    fn shell_files(&mut self, name: &str) -> Self::IntoIterator;
 }
 
 #[derive(Clone)]
-pub struct FsConfig {
+pub struct FsConfig<F, G>
+{
     root_path: PathBuf,
     current_shell: Option<String>,
+    f: Option<F>,
+    g: Option<G>,
 }
 
 fn read_shell_from_path(path: &PathBuf) -> io::Result<String> {
@@ -42,21 +51,26 @@ fn config_path(root_path: &PathBuf) -> PathBuf {
     root_path.join("current_shell")
 }
 
-impl FsConfig {
-    pub fn new(root_path: impl AsRef<Path>) -> FsConfig {
+impl<F, G> FsConfig<F, G> {
+    pub fn new(root_path: impl AsRef<Path>, f: F, g: G) -> FsConfig<F, G> {
         let root_path = PathBuf::from(root_path.as_ref());
         let config_path = config_path(&root_path);
         let current_shell = read_shell_from_path(&config_path).ok();
 
-        FsConfig { root_path, current_shell }
+        FsConfig { root_path, current_shell, f: Some(f), g: Some(g) }
     }
 
     fn config_path(&self) -> PathBuf {
-        config_path(&self.root_path())
+        config_path(&self.root_path)
     }
 }
 
-impl Config for FsConfig {
+impl<F, G> Config for FsConfig<F, G>
+where F: FnMut(Result<walkdir::DirEntry, walkdir::Error>) -> Option<walkdir::DirEntry>,
+      G: FnMut(walkdir::DirEntry) -> PathBuf,
+{
+    type IntoIterator = Files<F, G>;
+
     fn root_path(&self) -> &PathBuf {
         &self.root_path
     }
@@ -81,6 +95,63 @@ impl Config for FsConfig {
         let shell_path = self.shell_root_path().join(name);
         shell_path.is_dir()
     }
+
+    fn shell_files(&mut self, _name: &str) -> Self::IntoIterator {
+        Files::new(self.current_shell_path(), self.f.take().unwrap(), self.g.take().unwrap())
+    }
+}
+
+
+pub struct FilesIter<T>(Option<T>);
+
+impl<T> FilesIter<T> {
+    pub fn new(iter: Option<T>) -> FilesIter<T> {
+        FilesIter(iter)
+    }
+}
+
+impl<T> Iterator for FilesIter<T>
+where T: Iterator<Item = PathBuf>,
+{
+    type Item = PathBuf;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.as_mut().and_then(|mut iter| iter.next())
+    }
+}
+
+pub struct Files<F, G>(Option<WalkDir>, F, G);
+
+impl<F, G> Files<F, G>
+where F: FnMut(Result<walkdir::DirEntry, walkdir::Error>) -> Option<walkdir::DirEntry>,
+      G: FnMut(walkdir::DirEntry) -> PathBuf,
+{
+    pub fn new(shell_path: Option<impl AsRef<Path>>, f: F, g: G) -> Files<F, G> {
+        let walker =
+            shell_path.map(|path| {
+                WalkDir::new(path)
+                    .min_depth(1)
+                    .follow_links(false)
+            });
+        Files(walker, f, g)
+    }
+}
+
+impl<F, G> IntoIterator for Files<F, G>
+where F: FnMut(Result<walkdir::DirEntry, walkdir::Error>) -> Option<walkdir::DirEntry>,
+      G: FnMut(walkdir::DirEntry) -> PathBuf,
+{
+    type Item = PathBuf;
+    type IntoIter = FilesIter<iter::Map<iter::FilterMap<walkdir::IntoIter, F>, G>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        let Files(iter, f, g) = self;
+        let iter = iter
+            .map(|walker| {
+                walker.into_iter().filter_map(f).map(g)
+            });
+        FilesIter::new(iter)
+    }
 }
 
 #[cfg(test)]
@@ -96,6 +167,7 @@ pub mod mock {
         root_path: PathBuf,
         current_shell: String,
         allowed_shell_names: Vec<String>,
+        files: Vec<PathBuf>,
     }
 
     impl MockConfig {
@@ -104,6 +176,7 @@ pub mod mock {
                 root_path: PathBuf::from("/"),
                 allowed_shell_names: vec!["default".to_owned()],
                 current_shell: "default".to_owned(),
+                files: vec![],
             }
         }
 
@@ -112,11 +185,14 @@ pub mod mock {
                 root_path: PathBuf::from(root.as_ref()),
                 allowed_shell_names: vec!["default".to_owned()],
                 current_shell: "default".to_owned(),
+                files: vec![],
             }
         }
     }
 
     impl Config for MockConfig {
+        type IntoIterator = Vec<PathBuf>;
+
         fn root_path(&self) -> &PathBuf {
             &self.root_path
         }
@@ -133,6 +209,10 @@ pub mod mock {
         fn shell_exists(&self, name: &str) -> bool {
             self.allowed_shell_names.contains(&name.to_owned())
         }
+
+        fn shell_files(&mut self, _name: &str) -> Self::IntoIterator {
+            self.files.clone()
+        }
     }
 }
 
@@ -140,10 +220,11 @@ pub mod mock {
 mod test {
     use super::{Config, FsConfig};
 
-    use std::fs;
-    use std::fs::File;
-    use std::path::PathBuf;
+    use std::fs::{self, File};
+    use std::path::{Path, PathBuf};
     use std::io::prelude::*;
+
+    use walkdir;
 
     fn clean_up(test_root: &PathBuf) {
         if test_root.exists() {
@@ -173,17 +254,22 @@ mod test {
         test_root
     }
 
+    fn fs_config(test_root: impl AsRef<Path>) -> impl Config {
+        let f = |opt_entry: Result<walkdir::DirEntry, walkdir::Error>| { opt_entry.ok() };
+        let g = |entry: walkdir::DirEntry| { entry.path().to_owned() };
+        FsConfig::new(&test_root, f, g)
+    }
     #[test]
     fn has_a_root_path() {
         let test_root = set_up("root-path", "default", vec!["default"]);
-        let config = FsConfig::new(&test_root);
+        let config = fs_config(&test_root);
         assert_eq!(config.root_path(), &test_root);
     }
 
     #[test]
     fn returns_the_current_shell_name() {
         let test_root = set_up("current-shell-name", "current", vec!["current"]);
-        let config = FsConfig::new(&test_root);
+        let config = fs_config(&test_root);
 
         assert_eq!(*config.current_shell_name().unwrap(), "current".to_string());
     }
@@ -191,7 +277,7 @@ mod test {
     #[test]
     fn can_set_the_current_shell_name() {
         let test_root = set_up("set-current-shell-name", "default", vec!["default"]);
-        let mut config = FsConfig::new(&test_root);
+        let mut config = fs_config(&test_root);
         config.set_current_shell_name("current").unwrap();
 
         let mut config_file = File::open(&test_root.join("current_shell")).unwrap();
@@ -208,7 +294,7 @@ mod test {
         let test_root = set_up("confirm-shell-existence",
                                "default",
                                vec!["default", "other"]);
-        let config = FsConfig::new(&test_root);
+        let config = fs_config(&test_root);
 
         assert!(config.shell_exists("other"));
     }
@@ -218,8 +304,24 @@ mod test {
         let test_root = set_up("confirm-shell-non-existence",
                                "default",
                                vec!["default", "other"]);
-        let config = FsConfig::new(&test_root);
+        let config = fs_config(&test_root);
 
         assert!(!config.shell_exists("another"));
+    }
+
+    #[test]
+    fn can_walk_a_directory() {
+        let test_root = set_up("walk-directory",
+                               "default",
+                               vec!["default"]);
+        let mut config = fs_config(&test_root);
+        let shell_root = config.shell_root_path().join("default");
+        fs::File::create(&shell_root.join("file1")).expect("Failed to create test file");
+
+        let files = config.shell_files("default")
+            .into_iter()
+            .map(|f| f.to_string_lossy().to_string())
+            .collect::<Vec<_>>();
+        assert_eq!(files, vec!["file1"]);
     }
 }
