@@ -102,21 +102,21 @@ where F: FnMut(Result<walkdir::DirEntry, walkdir::Error>) -> Option<walkdir::Dir
 }
 
 
-pub struct FilesIter<T>(Option<T>);
+pub struct FilesIter<T, F, G>(Option<T>, F, G);
 
-impl<T> FilesIter<T> {
-    pub fn new(iter: Option<T>) -> FilesIter<T> {
-        FilesIter(iter)
+impl<T, F, G> FilesIter<T, F, G> {
+    pub fn new(iter: Option<T>, f: F, g: G) -> FilesIter<T, F, G> {
+        FilesIter(iter, f, g)
     }
 }
 
-impl<T> Iterator for FilesIter<T>
-where T: Iterator<Item = PathBuf>,
+impl<T, F, G> Iterator for FilesIter<T, F, G>
+where T: Iterator<Item = Result<walkdir::DirEntry, walkdir::Error>>,
 {
     type Item = PathBuf;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.0.as_mut().and_then(|mut iter| iter.next())
+        None
     }
 }
 
@@ -142,15 +142,12 @@ where F: FnMut(Result<walkdir::DirEntry, walkdir::Error>) -> Option<walkdir::Dir
       G: FnMut(walkdir::DirEntry) -> PathBuf,
 {
     type Item = PathBuf;
-    type IntoIter = FilesIter<iter::Map<iter::FilterMap<walkdir::IntoIter, F>, G>>;
+    type IntoIter = FilesIter<walkdir::IntoIter, F, G>;
 
     fn into_iter(self) -> Self::IntoIter {
         let Files(iter, f, g) = self;
-        let iter = iter
-            .map(|walker| {
-                walker.into_iter().filter_map(f).map(g)
-            });
-        FilesIter::new(iter)
+        let iter = iter.map(|walker| walker.into_iter());
+        FilesIter::new(iter, f, g)
     }
 }
 
