@@ -30,12 +30,10 @@ pub trait Config {
 }
 
 #[derive(Clone)]
-pub struct FsConfig<F, G>
+pub struct FsConfig
 {
     root_path: PathBuf,
     current_shell: Option<String>,
-    f: Option<F>,
-    g: Option<G>,
 }
 
 fn read_shell_from_path(path: &PathBuf) -> io::Result<String> {
@@ -51,13 +49,13 @@ fn config_path(root_path: &PathBuf) -> PathBuf {
     root_path.join("current_shell")
 }
 
-impl<F, G> FsConfig<F, G> {
-    pub fn new(root_path: impl AsRef<Path>, f: F, g: G) -> FsConfig<F, G> {
+impl FsConfig {
+    pub fn new(root_path: impl AsRef<Path>) -> FsConfig {
         let root_path = PathBuf::from(root_path.as_ref());
         let config_path = config_path(&root_path);
         let current_shell = read_shell_from_path(&config_path).ok();
 
-        FsConfig { root_path, current_shell, f: Some(f), g: Some(g) }
+        FsConfig { root_path, current_shell }
     }
 
     fn config_path(&self) -> PathBuf {
@@ -65,11 +63,8 @@ impl<F, G> FsConfig<F, G> {
     }
 }
 
-impl<F, G> Config for FsConfig<F, G>
-where F: FnMut(Result<walkdir::DirEntry, walkdir::Error>) -> Option<walkdir::DirEntry>,
-      G: FnMut(walkdir::DirEntry) -> PathBuf,
-{
-    type IntoIterator = Files<F, G>;
+impl Config for FsConfig {
+    type IntoIterator = Files;
 
     fn root_path(&self) -> &PathBuf {
         &self.root_path
@@ -97,20 +92,20 @@ where F: FnMut(Result<walkdir::DirEntry, walkdir::Error>) -> Option<walkdir::Dir
     }
 
     fn shell_files(&mut self, _name: &str) -> Self::IntoIterator {
-        Files::new(self.current_shell_path(), self.f.take().unwrap(), self.g.take().unwrap())
+        Files::new(self.current_shell_path())
     }
 }
 
 
-pub struct FilesIter<T, F, G>(Option<T>, F, G);
+pub struct FilesIter<T>(Option<T>);
 
-impl<T, F, G> FilesIter<T, F, G> {
-    pub fn new(iter: Option<T>, f: F, g: G) -> FilesIter<T, F, G> {
-        FilesIter(iter, f, g)
+impl<T> FilesIter<T> {
+    pub fn new(iter: Option<T>) -> FilesIter<T> {
+        FilesIter(iter)
     }
 }
 
-impl<T, F, G> Iterator for FilesIter<T, F, G>
+impl<T> Iterator for FilesIter<T>
 where T: Iterator<Item = Result<walkdir::DirEntry, walkdir::Error>>,
 {
     type Item = PathBuf;
@@ -130,34 +125,28 @@ where T: Iterator<Item = Result<walkdir::DirEntry, walkdir::Error>>,
     }
 }
 
-pub struct Files<F, G>(Option<WalkDir>, F, G);
+pub struct Files(Option<WalkDir>);
 
-impl<F, G> Files<F, G>
-where F: FnMut(Result<walkdir::DirEntry, walkdir::Error>) -> Option<walkdir::DirEntry>,
-      G: FnMut(walkdir::DirEntry) -> PathBuf,
-{
-    pub fn new(shell_path: Option<impl AsRef<Path>>, f: F, g: G) -> Files<F, G> {
+impl Files {
+    pub fn new(shell_path: Option<impl AsRef<Path>>) -> Files {
         let walker =
             shell_path.map(|path| {
                 WalkDir::new(path)
                     .min_depth(1)
                     .follow_links(false)
             });
-        Files(walker, f, g)
+        Files(walker)
     }
 }
 
-impl<F, G> IntoIterator for Files<F, G>
-where F: FnMut(Result<walkdir::DirEntry, walkdir::Error>) -> Option<walkdir::DirEntry>,
-      G: FnMut(walkdir::DirEntry) -> PathBuf,
-{
+impl IntoIterator for Files {
     type Item = PathBuf;
-    type IntoIter = FilesIter<walkdir::IntoIter, F, G>;
+    type IntoIter = FilesIter<walkdir::IntoIter>;
 
     fn into_iter(self) -> Self::IntoIter {
-        let Files(iter, f, g) = self;
+        let Files(iter) = self;
         let iter = iter.map(|walker| walker.into_iter());
-        FilesIter::new(iter, f, g)
+        FilesIter::new(iter)
     }
 }
 
@@ -262,9 +251,7 @@ mod test {
     }
 
     fn fs_config(test_root: impl AsRef<Path>) -> impl Config {
-        let f = |opt_entry: Result<walkdir::DirEntry, walkdir::Error>| { opt_entry.ok() };
-        let g = |entry: walkdir::DirEntry| { entry.path().to_owned() };
-        FsConfig::new(&test_root, f, g)
+        FsConfig::new(&test_root)
     }
     #[test]
     fn has_a_root_path() {

@@ -51,9 +51,7 @@ fn run() -> Result {
     let app_matches = app.get_matches();
 
     let hermit_root = env::get_hermit_dir().expect("Could not determine hermit root location.");
-    let fs_config = FsConfig::new::<>(hermit_root,
-                                      |opt_entry: result::Result<walkdir::DirEntry, walkdir::Error>| { opt_entry.ok() },
-                                      |entry: walkdir::DirEntry| { entry.path().to_owned() });
+    let fs_config = FsConfig::new::<>(hermit_root);
     let mut hermit = Hermit::new(fs_config);
 
     let home_dir = env::home_dir().expect("Could not determine home directory.");
