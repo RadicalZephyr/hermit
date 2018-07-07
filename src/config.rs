@@ -99,12 +99,6 @@ impl Config for FsConfig {
 
 pub struct FilesIter<T>(Option<(T, PathBuf)>);
 
-impl<T> FilesIter<T> {
-    pub fn new(iter: Option<(T, PathBuf)>) -> FilesIter<T> {
-        FilesIter(iter)
-    }
-}
-
 impl<T> Iterator for FilesIter<T>
 where T: Iterator<Item = Result<walkdir::DirEntry, walkdir::Error>>,
 {
@@ -118,8 +112,8 @@ where T: Iterator<Item = Result<walkdir::DirEntry, walkdir::Error>>,
                         let file_path = entry.path().to_path_buf();
                         let shell_relative_path = file_path
                             .strip_prefix(prefix_path)
-                            .unwrap()
-                            .to_path_buf();
+                            .unwrap()       // this unwrap is safe because
+                            .to_path_buf(); // of the Files::new constructor
                         return Some(shell_relative_path);
                     },
                     Some(Err(_)) => continue,
@@ -132,9 +126,18 @@ where T: Iterator<Item = Result<walkdir::DirEntry, walkdir::Error>>,
     }
 }
 
+/// A wrapper on WalkDir that handles nullability and bundles the walk
+/// root path.
+///
+/// In particular, this pair of values is used to generate `PathBuf`s
+/// relative to the specified root directory with
+/// `PathBuf::strip_prefix`, and since the `WalkDir` was created with
+/// the same path as `FilesIter` will use to strip the prefix, it is
+/// always safe to just unwrap the result returned by `strip_prefix`.
 pub struct Files(Option<(WalkDir, PathBuf)>);
 
 impl Files {
+    /// Constructs a new `Files` from a directory path.
     pub fn new(shell_path: Option<impl AsRef<Path>>) -> Files {
         let walker =
             shell_path.map(|path| {
@@ -154,7 +157,7 @@ impl IntoIterator for Files {
     fn into_iter(self) -> Self::IntoIter {
         let Files(opt) = self;
         let iter_opt = opt.map(|(walker, path)| (walker.into_iter(), path));
-        FilesIter::new(iter_opt)
+        FilesIter(iter_opt)
     }
 }
 
