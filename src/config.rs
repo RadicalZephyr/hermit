@@ -5,16 +5,14 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use git2;
+
 use walkdir::{self, WalkDir};
+
+use crate::status::Status;
 
 pub trait Config {
     type IntoIterator: IntoIterator<Item = PathBuf>;
-
-    fn root_path(&self) -> &PathBuf;
-
-    fn shell_root_path(&self) -> PathBuf {
-        self.root_path().join("shells")
-    }
 
     fn current_shell_name(&self) -> Option<&str>;
 
@@ -23,11 +21,19 @@ pub trait Config {
             .map(|name| self.shell_root_path().join(name))
     }
 
+    fn root_path(&self) -> &PathBuf;
+
     fn set_current_shell_name(&mut self, name: &str) -> io::Result<()>;
+
+    fn shell_root_path(&self) -> PathBuf {
+        self.root_path().join("shells")
+    }
 
     fn shell_exists(&self, name: &str) -> bool;
 
     fn shell_files(&self, name: &str) -> Self::IntoIterator;
+
+    fn status(&self) -> Status;
 }
 
 #[derive(Clone)]
@@ -95,6 +101,10 @@ impl Config for FsConfig {
 
     fn shell_files(&self, _name: &str) -> Self::IntoIterator {
         Files::new(self.current_shell_path())
+    }
+
+    fn status(&self) -> Status {
+        Status::new()
     }
 }
 
@@ -181,6 +191,8 @@ pub mod mock {
     use std::io;
     use std::path::{Path, PathBuf};
 
+    use crate::status::Status;
+
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct MockConfig {
         root_path: PathBuf,
@@ -238,6 +250,10 @@ pub mod mock {
 
         fn shell_files(&self, _name: &str) -> Self::IntoIterator {
             self.files.clone()
+        }
+
+        fn status(&self) -> Status {
+            Status::new()
         }
     }
 }

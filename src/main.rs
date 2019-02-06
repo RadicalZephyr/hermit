@@ -4,6 +4,7 @@ mod file_operations;
 mod hermit;
 mod message;
 mod shell;
+mod status;
 
 use std::process;
 
@@ -224,11 +225,13 @@ subcommand! {
 }
 
 fn handle_status<C: Config>(
-    _matches: &ArgMatches<'_>,
-    _hermit: &mut Hermit<C>,
+    _matches: &ArgMatches,
+    hermit: &mut Hermit<C>,
     _file_operations: &mut FileOperations,
 ) -> Result<()> {
-    not_implemented("status")
+    let shell = hermit.current_shell()?;
+    println!("{}", shell.status());
+    Ok(())
 }
 
 subcommand! {

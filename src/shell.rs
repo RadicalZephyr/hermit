@@ -1,6 +1,6 @@
 use std::{path::PathBuf, rc::Rc};
 
-use crate::{config::Config, file_operations::FileOperations};
+use crate::{config::Config, file_operations::FileOperations, status::Status};
 
 pub struct Shell<T: Config> {
     pub name: String,
@@ -15,6 +15,10 @@ impl<T: Config> Shell<T> {
 
     pub fn root_path(&self) -> PathBuf {
         self.config.shell_root_path().join(&self.name)
+    }
+
+    pub fn status(&self) -> Status {
+        Status::new(self.config.git_repository())
     }
 
     #[allow(dead_code)]
