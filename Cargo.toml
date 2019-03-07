@@ -15,7 +15,7 @@ license = "GPL-3.0"
 [dependencies]
 clap = "~2.32.0"
 failure = "~0.1.1"
-failure_derive = "~0.1.1"
+failure_derive = "~0.1.5"
 git2 = "~0.8.0"
 walkdir = "~2.2.7"
 
