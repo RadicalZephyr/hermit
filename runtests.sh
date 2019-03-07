@@ -48,7 +48,7 @@ export USE_HERMIT_RS=true
 export PROFILE_DIR_NAME=shells
 export USE_COMMAND=inhabit
 
-IGNORE_SUBCOMMAND_LIST=(add clone commands completions doctor git use link unlink utilities)
+IGNORE_SUBCOMMAND_LIST=(add clone commands completions doctor use link unlink utilities)
 
 ignore_tests
 

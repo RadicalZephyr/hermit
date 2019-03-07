@@ -1,4 +1,4 @@
-use std::{io, rc::Rc, result};
+use std::{io, process::Command, rc::Rc, result};
 
 use thiserror::Error;
 
@@ -14,6 +14,9 @@ pub enum Error {
 
     #[error("No shell is active right now")]
     NoActiveShell,
+
+    #[error("Command errored")]
+    CommandFailed,
 }
 
 impl From<io::Error> for Error {
@@ -48,6 +51,19 @@ impl<T: Config> Hermit<T> {
             None => unreachable!(message::error_str(
                 "attempted to modify config while it was being used."
             )),
+        }
+    }
+
+    pub fn run_git(&self, args: &Vec<String>) -> Result<()> {
+        let shell = self.current_shell()?;
+        let status = Command::new("git")
+            .current_dir(shell.root_path())
+            .args(args)
+            .status()?;
+        if status.success() {
+            Ok(())
+        } else {
+            Err(Error::CommandFailed)
         }
     }
 

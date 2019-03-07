@@ -157,16 +157,24 @@ fn handle_doctor<C: Config>(
 
 subcommand! {
   fn add_git_subcommand("git") {
-    about("Run git operations on the current shell")
+    about("Run git commands in the current shell directory")
+    settings(&[AppSettings::TrailingVarArg,
+               AppSettings::AllowLeadingHyphen])
+    arg(Arg::with_name("cmd")
+        .required(true)
+        .multiple(true)
+        .takes_value(true))
   }
 }
 
 fn handle_git<C: Config>(
-    _matches: &ArgMatches<'_>,
-    _hermit: &mut Hermit<C>,
+    matches: &ArgMatches,
+    hermit: &mut Hermit<C>,
     _file_operations: &mut FileOperations,
 ) -> Result<()> {
-    not_implemented("git")
+    let args = matches.values_of_lossy("cmd").unwrap();
+    hermit.run_git(&args)?;
+    Ok(())
 }
 
 subcommand! {
