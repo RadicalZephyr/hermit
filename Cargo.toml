@@ -13,7 +13,7 @@ keywords = ["home", "directory", "configuration", "management", "dotfiles"]
 license = "GPL-3.0"
 
 [dependencies]
-clap = "~2.32.0"
+clap = "~2.33.0"
 failure = "~0.1.1"
 failure_derive = "~0.1.1"
 git2 = "~0.8.0"
