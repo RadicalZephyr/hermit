@@ -79,6 +79,7 @@ jobs:
 
       - name: Build and Test
         run: bin/runtests.sh
+        shell: bash
 
       - name: Clippy
         run: cargo clippy --all
