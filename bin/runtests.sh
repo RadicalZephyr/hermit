@@ -21,7 +21,7 @@ function run_tests() {
 }
 
 URCHIN=$(which urchin)
-URCHIN=${URCHIN:-/tmp/urchin}
+URCHIN=${URCHIN:-./urchin}
 
 set -e
 

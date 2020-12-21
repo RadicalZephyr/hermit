@@ -65,7 +65,7 @@ jobs:
           cargo clippy --version
 
       - name: Install Urchin
-        run: curl -o /tmp/urchin https://raw.githubusercontent.com/tlevine/urchin/v0.0.6/urchin && chmod +x /tmp/urchin
+        run: curl -o ./urchin https://raw.githubusercontent.com/tlevine/urchin/v0.0.6/urchin && chmod +x ./urchin
 
       - name: Build and Test
         run: bin/runtests.sh
