@@ -44,7 +44,7 @@ jobs:
       # An issue with BSD Tar causes sporadic failures on macOS.
       # c.f https://github.com/actions/cache/issues/403
       - name: Install GNU Tar
-        if: startsWith(github.ref, 'refs/tags/') && matrix.os == 'macos-latest'
+        if: matrix.os == 'macos-latest'
         run: |
           brew install coreutils gnu-tar
           echo "/usr/local/opt/coreutils/libexec/gnubin" >> $GITHUB_PATH
