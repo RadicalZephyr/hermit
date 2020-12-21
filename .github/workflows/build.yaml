@@ -40,6 +40,16 @@ jobs:
           # Get everything to let the version work for shell hermit
           fetch-depth: 0
 
+      # N.B. Our current Urchin tests don't work with BSD coreutils
+      # An issue with BSD Tar causes sporadic failures on macOS.
+      # c.f https://github.com/actions/cache/issues/403
+      - name: Install GNU Tar
+        if: startsWith(github.ref, 'refs/tags/') && matrix.os == 'macos-latest'
+        run: |
+          brew install coreutils gnu-tar
+          echo "::add-path::/usr/local/opt/coreutils/libexec/gnubin"
+          echo "::add-path::/usr/local/opt/gnu-tar/libexec/gnubin"
+
       - name: Cache Cargo
         uses: actions/cache@v1
         with:
@@ -83,14 +93,6 @@ jobs:
 
       - name: Format
         run: cargo +nightly fmt --all -- --check
-
-      # An issue with BSD Tar causes sporadic failures on macOS.
-      # c.f https://github.com/actions/cache/issues/403
-      - name: Install GNU Tar
-        if: startsWith(github.ref, 'refs/tags/') && matrix.os == 'macos-latest'
-        run: |
-          brew install gnu-tar
-          echo "::add-path::/usr/local/opt/gnu-tar/libexec/gnubin"
 
       - name: Package
         id: package
