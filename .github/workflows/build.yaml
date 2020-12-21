@@ -47,8 +47,8 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/') && matrix.os == 'macos-latest'
         run: |
           brew install coreutils gnu-tar
-          echo "::add-path::/usr/local/opt/coreutils/libexec/gnubin"
-          echo "::add-path::/usr/local/opt/gnu-tar/libexec/gnubin"
+          echo "/usr/local/opt/coreutils/libexec/gnubin" >> $GITHUB_PATH
+          echo "/usr/local/opt/gnu-tar/libexec/gnubin" >> $GITHUB_PATH
 
       - name: Cache Cargo
         uses: actions/cache@v1
