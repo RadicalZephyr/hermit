@@ -119,7 +119,7 @@ mod tests {
     fn can_initialize_a_new_shell() {
         let config = MockConfig::with_root(".hermit-config");
         let mut hermit = hermit(&config);
-        let mut file_ops = FileOperations::rooted_at("/home/geoff");
+        let mut file_ops = FileOperations::rooted_at("/home/zefira");
 
         hermit
             .init_shell(&mut file_ops, "new-one")
@@ -127,12 +127,12 @@ mod tests {
         let first_op = &file_ops.operations()[0];
         assert_eq!(
             *first_op,
-            Op::MkDir(PathBuf::from("/home/geoff/.hermit-config/shells"))
+            Op::MkDir(PathBuf::from("/home/zefira/.hermit-config/shells"))
         );
         let second_op = &file_ops.operations()[1];
         assert_eq!(
             *second_op,
-            Op::GitInit(PathBuf::from("/home/geoff/.hermit-config/shells/new-one"))
+            Op::GitInit(PathBuf::from("/home/zefira/.hermit-config/shells/new-one"))
         );
     }
 
@@ -142,7 +142,7 @@ mod tests {
         let mut config = MockConfig::with_root(&hermit_root);
         config.set_paths(vec![".bashrc", ".boot/profile.boot"]);
         let mut hermit = hermit(&config);
-        let op_root_path = PathBuf::from("/home/geoff");
+        let op_root_path = PathBuf::from("/home/zefira");
         let mut file_ops = FileOperations::rooted_at(&op_root_path);
 
         hermit
